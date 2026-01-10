@@ -76,6 +76,13 @@ function RootLayoutNav({ isConfigured }: { isConfigured: boolean }) {
             headerBackTitle: 'Sessions',
           }}
         />
+        <Stack.Screen
+          name="debug"
+          options={{
+            headerShown: false,
+            presentation: 'modal',
+          }}
+        />
       </Stack>
     </ThemeProvider>
   );

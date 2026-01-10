@@ -4,6 +4,22 @@ import { AblyMessage, NotificationHistoryItem } from '@/types';
 let ablyClient: Ably.Realtime | null = null;
 let channel: Ably.RealtimeChannel | null = null;
 
+const MESSAGE_HISTORY_LIMIT = 50;
+let messageHistory: Array<{ message: AblyMessage; receivedAt: number }> = [];
+
+export interface DebugMessageHistoryItem {
+  message: AblyMessage;
+  receivedAt: number;
+}
+
+export function getMessageHistory(): DebugMessageHistoryItem[] {
+  return [...messageHistory];
+}
+
+export function clearMessageHistory(): void {
+  messageHistory = [];
+}
+
 export function initializeAbly(apiKey: string): Ably.Realtime {
   if (ablyClient) {
     ablyClient.close();
@@ -29,10 +45,18 @@ export function subscribeToMessages(
   if (!channel) return;
 
   channel.subscribe((message) => {
-    callback({
+    const ablyMessage: AblyMessage = {
       name: message.name ?? '',
       data: message.data as AblyMessage['data'],
-    });
+    };
+
+    // Store in debug history buffer
+    messageHistory.push({ message: ablyMessage, receivedAt: Date.now() });
+    if (messageHistory.length > MESSAGE_HISTORY_LIMIT) {
+      messageHistory.shift();
+    }
+
+    callback(ablyMessage);
   });
 }
 

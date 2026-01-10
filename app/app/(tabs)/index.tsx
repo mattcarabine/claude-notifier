@@ -167,10 +167,15 @@ export default function SessionsScreen(): React.JSX.Element {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.statusBar}>
-        <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
-        <Text style={[styles.statusText, { color: colors.tabIconDefault }]}>
-          {statusLabel}
-        </Text>
+        <Pressable
+          style={styles.statusIndicator}
+          onPress={() => router.push('/debug')}
+        >
+          <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
+          <Text style={[styles.statusText, { color: colors.tabIconDefault }]}>
+            {statusLabel}
+          </Text>
+        </Pressable>
         <View style={styles.statusBarSpacer} />
         <FilterButton
           isActive={isFilterActive}
@@ -218,6 +223,10 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: 4,
     marginRight: 8,
+  },
+  statusIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   statusText: {
     fontSize: 13,
