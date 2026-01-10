@@ -1,5 +1,6 @@
 import React from 'react';
-import { StyleSheet, View, Text } from 'react-native';
+import { StyleSheet, View, Text, Pressable } from 'react-native';
+import { router } from 'expo-router';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { NotificationHistoryItem } from '@/types';
 import { useColorScheme } from '@/components/useColorScheme';
@@ -45,8 +46,25 @@ export function NotificationItem({ item }: NotificationItemProps): React.JSX.Ele
   const colors = Colors[colorScheme ?? 'light'];
   const displayName = truncateName(item.friendly_name);
 
+  function handlePress(): void {
+    router.push({
+      pathname: '/event/[id]',
+      params: {
+        id: item.id,
+        event: JSON.stringify(item),
+      },
+    });
+  }
+
   return (
-    <View style={[styles.item, { backgroundColor: colors.background }]}>
+    <Pressable
+      onPress={handlePress}
+      style={({ pressed }) => [
+        styles.item,
+        { backgroundColor: colors.background },
+        pressed && styles.pressed,
+      ]}
+    >
       <View style={[styles.iconContainer, { backgroundColor: colors.tint + '20' }]}>
         <FontAwesome
           name={getNotificationIcon(item.notification_type)}
@@ -76,7 +94,7 @@ export function NotificationItem({ item }: NotificationItemProps): React.JSX.Ele
           </Text>
         )}
       </View>
-    </View>
+    </Pressable>
   );
 }
 
@@ -92,6 +110,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 2,
     elevation: 1,
+  },
+  pressed: {
+    opacity: 0.7,
   },
   iconContainer: {
     width: 44,

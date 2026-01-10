@@ -14,6 +14,7 @@ export interface NotificationHistoryItem {
   friendly_name: string;
   notification_type: 'permission_prompt' | 'elicitation_dialog' | 'finished';
   message?: string;
+  cwd?: string;
   timestamp: number;
 }
 

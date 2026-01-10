@@ -131,6 +131,7 @@ export function useSessions(options: UseSessionsOptions): UseSessionsReturn {
             friendly_name: session.friendly_name,
             notification_type: data.notification_type,
             message: data.message,
+            cwd: session.cwd,
             timestamp,
           };
           addNotificationToHistory(historyItem);

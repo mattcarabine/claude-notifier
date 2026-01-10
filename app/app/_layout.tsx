@@ -77,6 +77,13 @@ function RootLayoutNav({ isConfigured }: { isConfigured: boolean }) {
           }}
         />
         <Stack.Screen
+          name="event/[id]"
+          options={{
+            title: 'Event Details',
+            headerBackTitle: 'History',
+          }}
+        />
+        <Stack.Screen
           name="debug"
           options={{
             headerShown: false,
