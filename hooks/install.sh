@@ -75,24 +75,30 @@ EOF
 mkdir -p "$(dirname "$CLAUDE_SETTINGS")"
 
 if [ -f "$CLAUDE_SETTINGS" ]; then
-    # Merge hooks into existing settings, appending to existing hook arrays
-    jq --argjson new "$HOOKS_JSON" '
-        # For each hook type in the new config, append to existing array or create new
+    # Merge hooks into existing settings (idempotent - removes old entries first)
+    jq --arg cmd "$HOOK_COMMAND" --argjson new "$HOOKS_JSON" '
+        # Helper function to check if a hook entry uses our command
+        def has_our_command: .hooks[]? | .command == $cmd;
+
+        # For each hook type, filter out existing entries with our command, then add new ones
         .hooks = (
             (.hooks // {}) as $existing |
             ($new.hooks) as $newHooks |
-            $existing | to_entries | map({
+
+            # Process existing hook types: remove our hooks, keep others
+            ($existing | to_entries | map({
                 key: .key,
-                value: (
-                    if $newHooks[.key] then
-                        .value + $newHooks[.key]
-                    else
-                        .value
-                    end
-                )
+                value: [.value[]? | . as $item | if ($item | has_our_command) then empty else $item end]
+            }) | from_entries) as $cleaned |
+
+            # Merge: for each hook type, combine cleaned existing + new (if any)
+            ($cleaned | keys) + ($newHooks | keys) | unique | map(. as $k | {
+                key: $k,
+                value: (($cleaned[$k] // []) + ($newHooks[$k] // []))
             }) | from_entries |
-            # Add any new hook types that did not exist
-            . + ($newHooks | to_entries | map(select(.key as $k | $existing[$k] == null)) | from_entries)
+
+            # Remove empty arrays
+            with_entries(select(.value | length > 0))
         )
     ' "$CLAUDE_SETTINGS" > "$CLAUDE_SETTINGS.tmp"
     mv "$CLAUDE_SETTINGS.tmp" "$CLAUDE_SETTINGS"
