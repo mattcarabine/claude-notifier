@@ -11,12 +11,24 @@ interface SessionCardProps {
 }
 
 function getStatusColor(status: Session['status']): string {
-  return status === 'waiting' ? '#f59e0b' : '#10b981';
+  switch (status) {
+    case 'waiting':
+      return '#f59e0b'; // amber
+    case 'idle':
+      return '#6b7280'; // gray
+    case 'active':
+    default:
+      return '#10b981'; // green
+  }
 }
 
 function getStatusLabel(session: Session): string {
   if (session.status === 'active') {
     return 'Active';
+  }
+
+  if (session.status === 'idle') {
+    return 'Idle';
   }
 
   switch (session.notification_type) {

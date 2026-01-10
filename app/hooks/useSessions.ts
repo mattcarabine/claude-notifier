@@ -3,6 +3,7 @@ import { Session, AblyMessage, NotificationHistoryItem } from '@/types';
 import { addNotificationToHistory } from '@/services/storage';
 
 const STALE_CHECK_INTERVAL_MS = 10000; // 10 seconds
+const IDLE_THRESHOLD_MS = 60000; // 60 seconds
 
 interface UseSessionsOptions {
   finishedExpiryMinutes: number;
@@ -18,7 +19,7 @@ export function useSessions(options: UseSessionsOptions): UseSessionsReturn {
   const [sessions, setSessions] = useState<Session[]>([]);
   const sessionsRef = useRef<Map<string, Session>>(new Map());
 
-  // Check for expired finished sessions periodically
+  // Check for expired finished sessions and mark idle sessions periodically
   useEffect(() => {
     const interval = setInterval(() => {
       const now = Date.now();
@@ -26,9 +27,17 @@ export function useSessions(options: UseSessionsOptions): UseSessionsReturn {
       let hasChanges = false;
 
       sessionsRef.current.forEach((session, sessionId) => {
+        const age = now - session.last_seen * 1000;
+
+        // Mark active sessions as idle if no activity for 60 seconds
+        if (session.status === 'active' && age > IDLE_THRESHOLD_MS) {
+          session.status = 'idle';
+          sessionsRef.current.set(sessionId, session);
+          hasChanges = true;
+        }
+
         // Only expire sessions that are finished
         if (session.notification_type === 'finished') {
-          const age = now - session.last_seen * 1000;
           if (age > expiryMs) {
             sessionsRef.current.delete(sessionId);
             hasChanges = true;

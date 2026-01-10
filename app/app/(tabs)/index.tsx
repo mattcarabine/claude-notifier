@@ -62,7 +62,8 @@ export default function SessionsScreen(): React.JSX.Element {
     if (!filterSettings.activeOnly) {
       return sessions;
     }
-    return sessions.filter((session) => session.status === 'active');
+    // Include both active and idle sessions (exclude only waiting/finished)
+    return sessions.filter((session) => session.status === 'active' || session.status === 'idle');
   }, [sessions, filterSettings.activeOnly]);
 
   const isFilterActive = filterSettings.activeOnly;

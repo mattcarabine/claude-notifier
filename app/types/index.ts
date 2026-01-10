@@ -2,7 +2,7 @@ export interface Session {
   session_id: string;
   friendly_name: string;
   cwd: string;
-  status: 'active' | 'waiting';
+  status: 'active' | 'idle' | 'waiting';
   last_seen: number;
   notification_type?: 'permission_prompt' | 'elicitation_dialog' | 'finished';
   message?: string;
@@ -24,7 +24,7 @@ export interface AblyMessage {
     session_id: string;
     friendly_name?: string;
     cwd?: string;
-    status?: 'active' | 'waiting';
+    status?: 'active' | 'idle' | 'waiting';
     notification_type?: 'permission_prompt' | 'elicitation_dialog' | 'finished';
     message?: string;
     reason?: string;
