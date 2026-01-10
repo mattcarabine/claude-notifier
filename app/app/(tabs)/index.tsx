@@ -1,0 +1,208 @@
+import React, { useEffect, useState } from 'react';
+import {
+  StyleSheet,
+  View,
+  Text,
+  FlatList,
+  ActivityIndicator,
+  Pressable,
+} from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useColorScheme } from '@/components/useColorScheme';
+import Colors from '@/constants/Colors';
+import { SessionCard } from '@/components/SessionCard';
+import { useAbly } from '@/hooks/useAbly';
+import { useSessions } from '@/hooks/useSessions';
+import {
+  registerForPushNotifications,
+  addNotificationReceivedListener,
+  addNotificationResponseReceivedListener,
+} from '@/services/notifications';
+
+const BANNER_DISMISSED_KEY = 'push_notification_banner_dismissed';
+
+const CONNECTION_COLORS: Record<string, string> = {
+  connected: '#10b981',
+  connecting: '#f59e0b',
+};
+
+const CONNECTION_LABELS: Record<string, string> = {
+  connected: 'Connected to Ably',
+  connecting: 'Connecting...',
+};
+
+export default function SessionsScreen(): React.JSX.Element {
+  const colorScheme = useColorScheme();
+  const colors = Colors[colorScheme ?? 'light'];
+
+  const { sessions, handleMessage } = useSessions();
+  const { connectionState } = useAbly(handleMessage);
+  const [pushToken, setPushToken] = useState<string | null | undefined>(undefined);
+  const [bannerDismissed, setBannerDismissed] = useState(true);
+
+  useEffect(() => {
+    async function initPushNotifications(): Promise<void> {
+      const dismissed = await AsyncStorage.getItem(BANNER_DISMISSED_KEY);
+      setBannerDismissed(dismissed === 'true');
+
+      const token = await registerForPushNotifications();
+      setPushToken(token);
+    }
+
+    initPushNotifications();
+
+    const receivedSubscription = addNotificationReceivedListener((notification) => {
+      console.log('Notification received:', notification);
+    });
+
+    const responseSubscription = addNotificationResponseReceivedListener((response) => {
+      console.log('Notification tapped:', response);
+    });
+
+    return () => {
+      receivedSubscription.remove();
+      responseSubscription.remove();
+    };
+  }, []);
+
+  async function handleDismissBanner(): Promise<void> {
+    setBannerDismissed(true);
+    await AsyncStorage.setItem(BANNER_DISMISSED_KEY, 'true');
+  }
+
+  const showPushWarning = pushToken === null && !bannerDismissed;
+
+  const statusColor = CONNECTION_COLORS[connectionState] ?? '#ef4444';
+  const statusLabel = CONNECTION_LABELS[connectionState] ?? 'Disconnected';
+
+  function renderContent(): React.JSX.Element {
+    if (sessions.length > 0) {
+      return (
+        <FlatList
+          data={sessions}
+          keyExtractor={(item) => item.session_id}
+          renderItem={({ item }) => <SessionCard session={item} />}
+          contentContainerStyle={styles.list}
+          showsVerticalScrollIndicator={false}
+        />
+      );
+    }
+
+    if (connectionState === 'connecting') {
+      return (
+        <View style={styles.emptyState}>
+          <ActivityIndicator size="large" color={colors.tint} />
+        </View>
+      );
+    }
+
+    return (
+      <View style={styles.emptyState}>
+        <Text style={[styles.emptyTitle, { color: colors.text }]}>
+          No Active Sessions
+        </Text>
+        <Text style={[styles.emptyDescription, { color: colors.tabIconDefault }]}>
+          Start a Claude Code session on your Mac to see it here.
+        </Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={styles.statusBar}>
+        <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
+        <Text style={[styles.statusText, { color: colors.tabIconDefault }]}>
+          {statusLabel}
+        </Text>
+      </View>
+      {showPushWarning && (
+        <View style={styles.warningBanner}>
+          <View style={styles.warningContent}>
+            <Text style={styles.warningTitle}>Push Notifications Unavailable</Text>
+            <Text style={styles.warningText}>
+              Run "npx eas init" in the app folder to enable push notifications.
+            </Text>
+          </View>
+          <Pressable onPress={handleDismissBanner} style={styles.dismissButton}>
+            <Text style={styles.dismissText}>Dismiss</Text>
+          </Pressable>
+        </View>
+      )}
+      {renderContent()}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  statusBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(0,0,0,0.1)',
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 8,
+  },
+  statusText: {
+    fontSize: 13,
+  },
+  list: {
+    paddingVertical: 8,
+  },
+  emptyState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+  },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  emptyDescription: {
+    fontSize: 16,
+    textAlign: 'center',
+    lineHeight: 24,
+  },
+  warningBanner: {
+    backgroundColor: '#fef3c7',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#f59e0b',
+  },
+  warningContent: {
+    flex: 1,
+  },
+  warningTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#92400e',
+    marginBottom: 2,
+  },
+  warningText: {
+    fontSize: 13,
+    color: '#a16207',
+  },
+  dismissButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  dismissText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#92400e',
+  },
+});
