@@ -143,7 +143,11 @@ case "$HOOK_EVENT" in
         ELAPSED=$((TIMESTAMP - LAST_TIME))
 
         if [ "$ELAPSED" -ge "$HEARTBEAT_INTERVAL" ]; then
-            PAYLOAD=$(build_ably_payload '{session_id: $sid, timestamp: ($ts | tonumber)}')
+            FRIENDLY_NAME=$(get_friendly_name)
+            PAYLOAD=$(build_ably_payload \
+                --arg fn "$FRIENDLY_NAME" \
+                --arg cwd "$CWD" \
+                '{session_id: $sid, friendly_name: $fn, cwd: $cwd, timestamp: ($ts | tonumber)}')
             send_to_ably "activity_ping" "$PAYLOAD"
             echo "$TIMESTAMP" > "$LAST_HEARTBEAT_FILE"
         fi
@@ -152,7 +156,9 @@ case "$HOOK_EVENT" in
     "Stop")
         FRIENDLY_NAME=$(get_friendly_name)
         PAYLOAD=$(build_ably_payload \
-            '{session_id: $sid, status: "waiting", notification_type: "finished", timestamp: ($ts | tonumber)}')
+            --arg fn "$FRIENDLY_NAME" \
+            --arg cwd "$CWD" \
+            '{session_id: $sid, friendly_name: $fn, cwd: $cwd, status: "waiting", notification_type: "finished", timestamp: ($ts | tonumber)}')
         send_to_ably "status_update" "$PAYLOAD"
         send_push_notification "Finished" "${FRIENDLY_NAME:0:15}... is waiting for input"
         ;;
@@ -168,9 +174,11 @@ case "$HOOK_EVENT" in
 
         FRIENDLY_NAME=$(get_friendly_name)
         PAYLOAD=$(build_ably_payload \
+            --arg fn "$FRIENDLY_NAME" \
+            --arg cwd "$CWD" \
             --arg ntype "$NOTIFICATION_TYPE" \
             --arg msg "$MESSAGE" \
-            '{session_id: $sid, status: "waiting", notification_type: $ntype, message: $msg, timestamp: ($ts | tonumber)}')
+            '{session_id: $sid, friendly_name: $fn, cwd: $cwd, status: "waiting", notification_type: $ntype, message: $msg, timestamp: ($ts | tonumber)}')
         send_to_ably "status_update" "$PAYLOAD"
 
         # Determine push notification title based on type

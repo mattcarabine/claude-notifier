@@ -69,6 +69,13 @@ function RootLayoutNav({ isConfigured }: { isConfigured: boolean }) {
             presentation: 'fullScreenModal',
           }}
         />
+        <Stack.Screen
+          name="session/[id]"
+          options={{
+            title: 'Session Details',
+            headerBackTitle: 'Sessions',
+          }}
+        />
       </Stack>
     </ThemeProvider>
   );

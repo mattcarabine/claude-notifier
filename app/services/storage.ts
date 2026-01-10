@@ -1,10 +1,16 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Config, NotificationHistoryItem } from '@/types';
+import { Config, NotificationHistoryItem, SessionFilterSettings } from '@/types';
 
 const KEYS = {
   ABLY_API_KEY: 'ably_api_key',
   NOTIFICATION_HISTORY: 'notification_history',
+  SESSION_FILTER_SETTINGS: 'session_filter_settings',
 } as const;
+
+const DEFAULT_FILTER_SETTINGS: SessionFilterSettings = {
+  activeOnly: false,
+  finishedExpiryMinutes: 60,
+};
 
 export async function getAblyApiKey(): Promise<string | null> {
   try {
@@ -76,4 +82,22 @@ export async function mergeNotificationHistory(
 
 export async function clearNotificationHistory(): Promise<void> {
   await AsyncStorage.removeItem(KEYS.NOTIFICATION_HISTORY);
+}
+
+export async function getSessionFilterSettings(): Promise<SessionFilterSettings> {
+  try {
+    const data = await AsyncStorage.getItem(KEYS.SESSION_FILTER_SETTINGS);
+    return data ? { ...DEFAULT_FILTER_SETTINGS, ...JSON.parse(data) } : DEFAULT_FILTER_SETTINGS;
+  } catch {
+    return DEFAULT_FILTER_SETTINGS;
+  }
+}
+
+export async function setSessionFilterSettings(
+  settings: SessionFilterSettings
+): Promise<void> {
+  await AsyncStorage.setItem(
+    KEYS.SESSION_FILTER_SETTINGS,
+    JSON.stringify(settings)
+  );
 }

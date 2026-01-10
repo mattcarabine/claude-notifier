@@ -2,29 +2,37 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { Session, AblyMessage, NotificationHistoryItem } from '@/types';
 import { addNotificationToHistory } from '@/services/storage';
 
-const STALE_THRESHOLD_MS = 60000; // 60 seconds
 const STALE_CHECK_INTERVAL_MS = 10000; // 10 seconds
+
+interface UseSessionsOptions {
+  finishedExpiryMinutes: number;
+}
 
 interface UseSessionsReturn {
   sessions: Session[];
   handleMessage: (message: AblyMessage) => void;
 }
 
-export function useSessions(): UseSessionsReturn {
+export function useSessions(options: UseSessionsOptions): UseSessionsReturn {
+  const { finishedExpiryMinutes } = options;
   const [sessions, setSessions] = useState<Session[]>([]);
   const sessionsRef = useRef<Map<string, Session>>(new Map());
 
-  // Check for stale sessions periodically
+  // Check for expired finished sessions periodically
   useEffect(() => {
     const interval = setInterval(() => {
       const now = Date.now();
+      const expiryMs = finishedExpiryMinutes * 60 * 1000;
       let hasChanges = false;
 
       sessionsRef.current.forEach((session, sessionId) => {
-        const age = now - session.last_seen * 1000;
-        if (age > STALE_THRESHOLD_MS) {
-          sessionsRef.current.delete(sessionId);
-          hasChanges = true;
+        // Only expire sessions that are finished
+        if (session.notification_type === 'finished') {
+          const age = now - session.last_seen * 1000;
+          if (age > expiryMs) {
+            sessionsRef.current.delete(sessionId);
+            hasChanges = true;
+          }
         }
       });
 
@@ -34,7 +42,7 @@ export function useSessions(): UseSessionsReturn {
     }, STALE_CHECK_INTERVAL_MS);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [finishedExpiryMinutes]);
 
   const handleMessage = useCallback((message: AblyMessage) => {
     const { name, data } = message;
@@ -65,34 +73,67 @@ export function useSessions(): UseSessionsReturn {
         if (existing) {
           existing.last_seen = timestamp;
           existing.status = 'active';
+          // Update friendly_name/cwd if we have better data now
+          if (data.friendly_name && existing.friendly_name === 'Active Session') {
+            existing.friendly_name = data.friendly_name;
+          }
+          if (data.cwd && !existing.cwd) {
+            existing.cwd = data.cwd;
+          }
           sessionsRef.current.set(session_id, existing);
-          setSessions(Array.from(sessionsRef.current.values()));
+        } else {
+          // Create session from ping if we missed session_start
+          const newSession: Session = {
+            session_id,
+            friendly_name: data.friendly_name || 'Active Session',
+            cwd: data.cwd || '',
+            status: 'active',
+            last_seen: timestamp,
+          };
+          sessionsRef.current.set(session_id, newSession);
         }
+        setSessions(Array.from(sessionsRef.current.values()));
         break;
       }
 
       case 'status_update': {
-        const existing = sessionsRef.current.get(session_id);
-        if (existing) {
-          existing.last_seen = timestamp;
-          existing.status = data.status || 'waiting';
-          existing.notification_type = data.notification_type;
-          existing.message = data.message;
-          sessionsRef.current.set(session_id, existing);
-          setSessions(Array.from(sessionsRef.current.values()));
-
-          // Add to notification history if it's a notification
-          if (data.notification_type) {
-            const historyItem: NotificationHistoryItem = {
-              id: `${session_id}-${timestamp}`,
-              session_id,
-              friendly_name: existing.friendly_name,
-              notification_type: data.notification_type,
-              message: data.message,
-              timestamp,
-            };
-            addNotificationToHistory(historyItem);
+        let session = sessionsRef.current.get(session_id);
+        if (!session) {
+          // Create session from status_update if we missed session_start
+          session = {
+            session_id,
+            friendly_name: data.friendly_name || 'Active Session',
+            cwd: data.cwd || '',
+            status: data.status || 'waiting',
+            last_seen: timestamp,
+          };
+        } else {
+          // Update friendly_name/cwd if we have better data now
+          if (data.friendly_name && session.friendly_name === 'Active Session') {
+            session.friendly_name = data.friendly_name;
           }
+          if (data.cwd && !session.cwd) {
+            session.cwd = data.cwd;
+          }
+        }
+        session.last_seen = timestamp;
+        session.status = data.status || 'waiting';
+        session.notification_type = data.notification_type;
+        session.message = data.message;
+        sessionsRef.current.set(session_id, session);
+        setSessions(Array.from(sessionsRef.current.values()));
+
+        // Add to notification history if it's a notification
+        if (data.notification_type) {
+          const historyItem: NotificationHistoryItem = {
+            id: `${session_id}-${timestamp}`,
+            session_id,
+            friendly_name: session.friendly_name,
+            notification_type: data.notification_type,
+            message: data.message,
+            timestamp,
+          };
+          addNotificationToHistory(historyItem);
         }
         break;
       }

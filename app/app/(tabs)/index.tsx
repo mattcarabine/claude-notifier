@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
   StyleSheet,
   View,
@@ -8,11 +8,19 @@ import {
   Pressable,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { router } from 'expo-router';
 import { useColorScheme } from '@/components/useColorScheme';
+import { Session, SessionFilterSettings } from '@/types';
 import Colors from '@/constants/Colors';
 import { SessionCard } from '@/components/SessionCard';
+import { FilterButton } from '@/components/FilterButton';
+import { SessionFilterModal } from '@/components/SessionFilterModal';
 import { useAbly } from '@/hooks/useAbly';
 import { useSessions } from '@/hooks/useSessions';
+import {
+  getSessionFilterSettings,
+  setSessionFilterSettings,
+} from '@/services/storage';
 import {
   registerForPushNotifications,
   addNotificationReceivedListener,
@@ -20,6 +28,11 @@ import {
 } from '@/services/notifications';
 
 const BANNER_DISMISSED_KEY = 'push_notification_banner_dismissed';
+
+const DEFAULT_FILTER_SETTINGS: SessionFilterSettings = {
+  activeOnly: false,
+  finishedExpiryMinutes: 60,
+};
 
 const CONNECTION_COLORS: Record<string, string> = {
   connected: '#10b981',
@@ -35,10 +48,47 @@ export default function SessionsScreen(): React.JSX.Element {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
 
-  const { sessions, handleMessage } = useSessions();
-  const { connectionState } = useAbly(handleMessage);
+  const [filterSettings, setFilterSettings] = useState<SessionFilterSettings>(DEFAULT_FILTER_SETTINGS);
+  const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [pushToken, setPushToken] = useState<string | null | undefined>(undefined);
   const [bannerDismissed, setBannerDismissed] = useState(true);
+
+  const { sessions, handleMessage } = useSessions({
+    finishedExpiryMinutes: filterSettings.finishedExpiryMinutes,
+  });
+  const { connectionState } = useAbly(handleMessage);
+
+  const filteredSessions = useMemo(() => {
+    if (!filterSettings.activeOnly) {
+      return sessions;
+    }
+    return sessions.filter((session) => session.status === 'active');
+  }, [sessions, filterSettings.activeOnly]);
+
+  const isFilterActive = filterSettings.activeOnly;
+
+  function handleSessionPress(session: Session): void {
+    router.push({
+      pathname: '/session/[id]',
+      params: {
+        id: session.session_id,
+        session: JSON.stringify(session),
+      },
+    });
+  }
+
+  async function handleFilterSettingsChange(newSettings: SessionFilterSettings): Promise<void> {
+    setFilterSettings(newSettings);
+    await setSessionFilterSettings(newSettings);
+  }
+
+  useEffect(() => {
+    async function loadSettings(): Promise<void> {
+      const settings = await getSessionFilterSettings();
+      setFilterSettings(settings);
+    }
+    loadSettings();
+  }, []);
 
   useEffect(() => {
     async function initPushNotifications(): Promise<void> {
@@ -76,12 +126,14 @@ export default function SessionsScreen(): React.JSX.Element {
   const statusLabel = CONNECTION_LABELS[connectionState] ?? 'Disconnected';
 
   function renderContent(): React.JSX.Element {
-    if (sessions.length > 0) {
+    if (filteredSessions.length > 0) {
       return (
         <FlatList
-          data={sessions}
+          data={filteredSessions}
           keyExtractor={(item) => item.session_id}
-          renderItem={({ item }) => <SessionCard session={item} />}
+          renderItem={({ item }) => (
+            <SessionCard session={item} onPress={() => handleSessionPress(item)} />
+          )}
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
         />
@@ -96,13 +148,17 @@ export default function SessionsScreen(): React.JSX.Element {
       );
     }
 
+    const emptyMessage = filterSettings.activeOnly && sessions.length > 0
+      ? 'No active sessions. Adjust filters to see finished sessions.'
+      : 'Start a Claude Code session on your Mac to see it here.';
+
     return (
       <View style={styles.emptyState}>
         <Text style={[styles.emptyTitle, { color: colors.text }]}>
           No Active Sessions
         </Text>
         <Text style={[styles.emptyDescription, { color: colors.tabIconDefault }]}>
-          Start a Claude Code session on your Mac to see it here.
+          {emptyMessage}
         </Text>
       </View>
     );
@@ -115,6 +171,11 @@ export default function SessionsScreen(): React.JSX.Element {
         <Text style={[styles.statusText, { color: colors.tabIconDefault }]}>
           {statusLabel}
         </Text>
+        <View style={styles.statusBarSpacer} />
+        <FilterButton
+          isActive={isFilterActive}
+          onPress={() => setFilterModalVisible(true)}
+        />
       </View>
       {showPushWarning && (
         <View style={styles.warningBanner}>
@@ -130,6 +191,12 @@ export default function SessionsScreen(): React.JSX.Element {
         </View>
       )}
       {renderContent()}
+      <SessionFilterModal
+        visible={filterModalVisible}
+        settings={filterSettings}
+        onSettingsChange={handleFilterSettingsChange}
+        onClose={() => setFilterModalVisible(false)}
+      />
     </View>
   );
 }
@@ -154,6 +221,9 @@ const styles = StyleSheet.create({
   },
   statusText: {
     fontSize: 13,
+  },
+  statusBarSpacer: {
+    flex: 1,
   },
   list: {
     paddingVertical: 8,

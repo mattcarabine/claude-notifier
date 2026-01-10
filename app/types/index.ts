@@ -34,3 +34,8 @@ export interface AblyMessage {
 export interface Config {
   ably_api_key: string | null;
 }
+
+export interface SessionFilterSettings {
+  activeOnly: boolean;
+  finishedExpiryMinutes: number; // 5 to 1440 (24 hours)
+}
