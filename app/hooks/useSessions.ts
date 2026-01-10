@@ -73,8 +73,8 @@ export function useSessions(options: UseSessionsOptions): UseSessionsReturn {
         if (existing) {
           existing.last_seen = timestamp;
           existing.status = 'active';
-          // Update friendly_name/cwd if we have better data now
-          if (data.friendly_name && existing.friendly_name === 'Active Session') {
+          // Update friendly_name if the new one is more complete (has " - " with message snippet)
+          if (data.friendly_name && data.friendly_name.includes(' - ') && !existing.friendly_name.includes(' - ')) {
             existing.friendly_name = data.friendly_name;
           }
           if (data.cwd && !existing.cwd) {
@@ -108,8 +108,8 @@ export function useSessions(options: UseSessionsOptions): UseSessionsReturn {
             last_seen: timestamp,
           };
         } else {
-          // Update friendly_name/cwd if we have better data now
-          if (data.friendly_name && session.friendly_name === 'Active Session') {
+          // Update friendly_name if the new one is more complete (has " - " with message snippet)
+          if (data.friendly_name && data.friendly_name.includes(' - ') && !session.friendly_name.includes(' - ')) {
             session.friendly_name = data.friendly_name;
           }
           if (data.cwd && !session.cwd) {

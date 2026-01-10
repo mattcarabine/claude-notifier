@@ -81,27 +81,56 @@ send_push_notification() {
 get_friendly_name() {
     local friendly_name_file="$SESSION_DIR/friendly_name"
 
+    # If cached name exists and is "complete" (has " - "), use it
     if [ -f "$friendly_name_file" ]; then
-        cat "$friendly_name_file"
-        return
+        local cached_name
+        cached_name=$(cat "$friendly_name_file")
+        if [[ "$cached_name" == *" - "* ]]; then
+            echo "$cached_name"
+            return
+        fi
+        # Otherwise, try to get a complete name (transcript may have user message now)
     fi
 
-    # Extract first user message from transcript for friendly name
-    local friendly_name=""
+    # Extract project name from cwd
+    local project_name=""
+    if [ -n "$CWD" ]; then
+        project_name=$(basename "$CWD")
+    fi
+
+    # Extract first user message from transcript
+    local message_snippet=""
     if [ -f "$TRANSCRIPT_PATH" ]; then
-        friendly_name=$(grep -m1 '"role":"user"' "$TRANSCRIPT_PATH" 2>/dev/null | \
-            jq -r '.message.content[0].text // empty' 2>/dev/null | \
-            head -c 50 | \
+        # User messages have type:"user" and message.content is a string
+        message_snippet=$(grep -m1 '"type":"user"' "$TRANSCRIPT_PATH" 2>/dev/null | \
+            jq -r '.message.content // empty' 2>/dev/null | \
+            head -c 35 | \
             tr '\n' ' ' | \
             sed 's/[[:space:]]*$//')
     fi
 
-    # Fallback to session ID prefix if no prompt found
-    if [ -z "$friendly_name" ]; then
+    # Build friendly name with fallback chain
+    local friendly_name=""
+    local is_complete=false
+    if [ -n "$project_name" ] && [ -n "$message_snippet" ] && [ ${#message_snippet} -ge 5 ]; then
+        friendly_name="$project_name - $message_snippet"
+        is_complete=true
+    elif [ -n "$project_name" ]; then
+        friendly_name="$project_name"
+    elif [ -n "$message_snippet" ]; then
+        friendly_name="$message_snippet"
+    else
         friendly_name="Session ${SESSION_ID:0:8}"
     fi
 
-    echo "$friendly_name" > "$friendly_name_file"
+    # Truncate if too long
+    friendly_name="${friendly_name:0:50}"
+
+    # Only cache if we have a complete name (with message snippet)
+    if [ "$is_complete" = true ]; then
+        echo "$friendly_name" > "$friendly_name_file"
+    fi
+
     echo "$friendly_name"
 }
 
@@ -160,7 +189,7 @@ case "$HOOK_EVENT" in
             --arg cwd "$CWD" \
             '{session_id: $sid, friendly_name: $fn, cwd: $cwd, status: "waiting", notification_type: "finished", timestamp: ($ts | tonumber)}')
         send_to_ably "status_update" "$PAYLOAD"
-        send_push_notification "Finished" "${FRIENDLY_NAME:0:15}... is waiting for input"
+        send_push_notification "Finished" "${FRIENDLY_NAME:0:30} is waiting for input"
         ;;
 
     "Notification")
@@ -188,7 +217,7 @@ case "$HOOK_EVENT" in
             *) PUSH_TITLE="Notification" ;;
         esac
 
-        send_push_notification "$PUSH_TITLE" "${FRIENDLY_NAME:0:15}... $MESSAGE"
+        send_push_notification "$PUSH_TITLE" "${FRIENDLY_NAME:0:30} - $MESSAGE"
         ;;
 esac
 

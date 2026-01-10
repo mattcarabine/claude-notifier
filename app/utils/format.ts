@@ -21,7 +21,7 @@ export function formatTimestamp(timestamp: number, includeTime = false): string 
   return includeTime ? date.toLocaleString() : date.toLocaleDateString();
 }
 
-export function truncateName(name: string, maxLength = 15): string {
+export function truncateName(name: string, maxLength = 30): string {
   if (name.length <= maxLength) {
     return name;
   }
