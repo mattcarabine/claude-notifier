@@ -43,6 +43,38 @@ function getStatusLabel(session: Session): string {
   }
 }
 
+const ACTIVE_PHRASES = [
+  'Spelunking...',
+  'Cogitating...',
+  'Whirring...',
+  'Pondering...',
+  'Ruminating...',
+  'Tinkering...',
+];
+
+function hashCode(str: string): number {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash << 5) - hash) + str.charCodeAt(i);
+    hash |= 0;
+  }
+  return Math.abs(hash);
+}
+
+function getStatusMessage(session: Session): string {
+  if (session.status === 'waiting' && session.message) {
+    return session.message;
+  }
+
+  if (session.status === 'idle') {
+    return 'Claude has finished executing';
+  }
+
+  // Active status - use deterministic phrase based on session_id
+  const index = hashCode(session.session_id) % ACTIVE_PHRASES.length;
+  return ACTIVE_PHRASES[index];
+}
+
 export function SessionCard({ session, onPress }: SessionCardProps): React.JSX.Element {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
@@ -70,14 +102,12 @@ export function SessionCard({ session, onPress }: SessionCardProps): React.JSX.E
 
       <Text style={[styles.name, { color: colors.text }]}>{displayName}</Text>
 
-      {session.message && (
-        <Text
-          style={[styles.message, { color: colors.tabIconDefault }]}
-          numberOfLines={2}
-        >
-          {session.message}
-        </Text>
-      )}
+      <Text
+        style={[styles.message, { color: colors.tabIconDefault }]}
+        numberOfLines={2}
+      >
+        {getStatusMessage(session)}
+      </Text>
 
       <Text style={[styles.cwd, { color: colors.tabIconDefault }]} numberOfLines={1}>
         {session.cwd}
