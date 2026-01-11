@@ -19,8 +19,6 @@ function getNotificationIcon(
       return 'shield';
     case 'elicitation_dialog':
       return 'question-circle';
-    case 'finished':
-      return 'check-circle';
     default:
       return 'bell';
   }
@@ -34,8 +32,6 @@ function getNotificationLabel(
       return 'Approval needed';
     case 'elicitation_dialog':
       return 'Question';
-    case 'finished':
-      return 'Finished';
     default:
       return 'Notification';
   }

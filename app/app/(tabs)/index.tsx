@@ -31,7 +31,7 @@ const BANNER_DISMISSED_KEY = 'push_notification_banner_dismissed';
 
 const DEFAULT_FILTER_SETTINGS: SessionFilterSettings = {
   activeOnly: false,
-  finishedExpiryMinutes: 60,
+  idleExpiryMinutes: 60,
 };
 
 const CONNECTION_COLORS: Record<string, string> = {
@@ -54,7 +54,7 @@ export default function SessionsScreen(): React.JSX.Element {
   const [bannerDismissed, setBannerDismissed] = useState(true);
 
   const { sessions, handleMessage } = useSessions({
-    finishedExpiryMinutes: filterSettings.finishedExpiryMinutes,
+    idleExpiryMinutes: filterSettings.idleExpiryMinutes,
   });
   const { connectionState } = useAbly(handleMessage);
 
@@ -62,8 +62,8 @@ export default function SessionsScreen(): React.JSX.Element {
     if (!filterSettings.activeOnly) {
       return sessions;
     }
-    // Include both active and idle sessions (exclude only waiting/finished)
-    return sessions.filter((session) => session.status === 'active' || session.status === 'idle');
+    // Show only sessions where Claude is actively working
+    return sessions.filter((session) => session.status === 'active');
   }, [sessions, filterSettings.activeOnly]);
 
   const isFilterActive = filterSettings.activeOnly;
@@ -150,7 +150,7 @@ export default function SessionsScreen(): React.JSX.Element {
     }
 
     const emptyMessage = filterSettings.activeOnly && sessions.length > 0
-      ? 'No active sessions. Adjust filters to see finished sessions.'
+      ? 'No active sessions. Adjust filters to see all sessions.'
       : 'Start a Claude Code session on your Mac to see it here.';
 
     return (

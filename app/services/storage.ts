@@ -9,7 +9,7 @@ const KEYS = {
 
 const DEFAULT_FILTER_SETTINGS: SessionFilterSettings = {
   activeOnly: false,
-  finishedExpiryMinutes: 60,
+  idleExpiryMinutes: 60,
 };
 
 export async function getAblyApiKey(): Promise<string | null> {
@@ -87,7 +87,16 @@ export async function clearNotificationHistory(): Promise<void> {
 export async function getSessionFilterSettings(): Promise<SessionFilterSettings> {
   try {
     const data = await AsyncStorage.getItem(KEYS.SESSION_FILTER_SETTINGS);
-    return data ? { ...DEFAULT_FILTER_SETTINGS, ...JSON.parse(data) } : DEFAULT_FILTER_SETTINGS;
+    if (data) {
+      const parsed = JSON.parse(data);
+      // Migration: rename finishedExpiryMinutes to idleExpiryMinutes
+      if ('finishedExpiryMinutes' in parsed && !('idleExpiryMinutes' in parsed)) {
+        parsed.idleExpiryMinutes = parsed.finishedExpiryMinutes;
+        delete parsed.finishedExpiryMinutes;
+      }
+      return { ...DEFAULT_FILTER_SETTINGS, ...parsed };
+    }
+    return DEFAULT_FILTER_SETTINGS;
   } catch {
     return DEFAULT_FILTER_SETTINGS;
   }

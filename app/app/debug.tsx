@@ -23,7 +23,7 @@ export default function DebugScreen(): React.JSX.Element {
   const [messageHistory, setMessageHistory] = useState<DebugMessageHistoryItem[]>(getMessageHistory);
   const [snapshotTime] = useState(new Date());
 
-  const { sessions, handleMessage } = useSessions({ finishedExpiryMinutes: 60 });
+  const { sessions, handleMessage } = useSessions({ idleExpiryMinutes: 60 });
   const { connectionState } = useAbly(handleMessage);
 
   const onRefresh = useCallback(() => {

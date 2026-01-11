@@ -23,8 +23,6 @@ function getNotificationIcon(
       return 'shield';
     case 'elicitation_dialog':
       return 'question-circle';
-    case 'finished':
-      return 'check-circle';
     default:
       return 'bell';
   }
@@ -38,8 +36,6 @@ function getNotificationLabel(
       return 'Approval Needed';
     case 'elicitation_dialog':
       return 'Question';
-    case 'finished':
-      return 'Finished';
     default:
       return 'Notification';
   }
@@ -53,8 +49,6 @@ function getNotificationColor(
       return '#ef4444'; // red
     case 'elicitation_dialog':
       return '#f59e0b'; // amber
-    case 'finished':
-      return '#10b981'; // green
     default:
       return '#6b7280'; // gray
   }

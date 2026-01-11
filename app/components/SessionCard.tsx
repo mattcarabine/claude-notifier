@@ -16,6 +16,8 @@ function getStatusColor(status: Session['status']): string {
       return '#f59e0b'; // amber
     case 'idle':
       return '#6b7280'; // gray
+    case 'zombie':
+      return '#ef4444'; // red
     case 'active':
     default:
       return '#10b981'; // green
@@ -31,13 +33,16 @@ function getStatusLabel(session: Session): string {
     return 'Idle';
   }
 
+  if (session.status === 'zombie') {
+    return 'Disconnected';
+  }
+
+  // status === 'waiting'
   switch (session.notification_type) {
     case 'permission_prompt':
       return 'Needs Approval';
     case 'elicitation_dialog':
       return 'Has Question';
-    case 'finished':
-      return 'Finished';
     default:
       return 'Waiting';
   }
@@ -67,7 +72,11 @@ function getStatusMessage(session: Session): string {
   }
 
   if (session.status === 'idle') {
-    return 'Claude has finished executing';
+    return 'Claude has finished and is awaiting input';
+  }
+
+  if (session.status === 'zombie') {
+    return 'Session may have ended unexpectedly';
   }
 
   // Active status - use deterministic phrase based on session_id

@@ -55,7 +55,7 @@ export function SessionFilterModal({
   const colors = Colors[colorScheme ?? 'light'];
   const isDark = colorScheme === 'dark';
 
-  const sliderValue = minutesToSliderValue(settings.finishedExpiryMinutes);
+  const sliderValue = minutesToSliderValue(settings.idleExpiryMinutes);
 
   function handleActiveOnlyChange(value: boolean): void {
     onSettingsChange({ ...settings, activeOnly: value });
@@ -63,7 +63,7 @@ export function SessionFilterModal({
 
   function handleExpiryChange(value: number): void {
     const minutes = sliderValueToMinutes(value);
-    onSettingsChange({ ...settings, finishedExpiryMinutes: minutes });
+    onSettingsChange({ ...settings, idleExpiryMinutes: minutes });
   }
 
   return (
@@ -103,7 +103,7 @@ export function SessionFilterModal({
 
           <View style={styles.section}>
             <Text style={[styles.label, { color: colors.text }]}>
-              Finished session expiry
+              Idle session expiry
             </Text>
             <Slider
               style={styles.slider}
@@ -117,7 +117,7 @@ export function SessionFilterModal({
               thumbTintColor={colors.tint}
             />
             <Text style={[styles.expiryValue, { color: colors.tabIconDefault }]}>
-              {formatExpiry(settings.finishedExpiryMinutes)}
+              {formatExpiry(settings.idleExpiryMinutes)}
             </Text>
           </View>
         </Pressable>

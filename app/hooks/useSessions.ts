@@ -1,12 +1,14 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import * as Notifications from 'expo-notifications';
 import { Session, AblyMessage, NotificationHistoryItem } from '@/types';
 import { addNotificationToHistory } from '@/services/storage';
 
 const STALE_CHECK_INTERVAL_MS = 10000; // 10 seconds
-const IDLE_THRESHOLD_MS = 60000; // 60 seconds
+const ZOMBIE_THRESHOLD_MS = 60000; // 60 seconds - session becomes zombie after no activity
+const ZOMBIE_TTL_MS = 600000; // 10 minutes - zombie sessions are removed after this
 
 interface UseSessionsOptions {
-  finishedExpiryMinutes: number;
+  idleExpiryMinutes: number;
 }
 
 interface UseSessionsReturn {
@@ -14,34 +16,58 @@ interface UseSessionsReturn {
   handleMessage: (message: AblyMessage) => void;
 }
 
+// Send local push notification for zombie transition
+async function sendZombieNotification(sessionName: string, sessionId: string): Promise<void> {
+  try {
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: 'Session Disconnected',
+        body: `${sessionName.substring(0, 30)} may have ended unexpectedly`,
+        data: { session_id: sessionId },
+      },
+      trigger: null, // Send immediately
+    });
+  } catch (error) {
+    console.error('Failed to send zombie notification:', error);
+  }
+}
+
 export function useSessions(options: UseSessionsOptions): UseSessionsReturn {
-  const { finishedExpiryMinutes } = options;
+  const { idleExpiryMinutes } = options;
   const [sessions, setSessions] = useState<Session[]>([]);
   const sessionsRef = useRef<Map<string, Session>>(new Map());
 
-  // Check for expired finished sessions and mark idle sessions periodically
+  // Check for zombie transitions and expired sessions periodically
   useEffect(() => {
     const interval = setInterval(() => {
       const now = Date.now();
-      const expiryMs = finishedExpiryMinutes * 60 * 1000;
+      const idleExpiryMs = idleExpiryMinutes * 60 * 1000;
       let hasChanges = false;
 
       sessionsRef.current.forEach((session, sessionId) => {
         const age = now - session.last_seen * 1000;
 
-        // Mark active sessions as idle if no activity for 60 seconds
-        if (session.status === 'active' && age > IDLE_THRESHOLD_MS) {
-          session.status = 'idle';
+        // Transition active sessions to zombie if no activity for 60 seconds
+        // This handles CTRL+C or other abrupt terminations
+        if (session.status === 'active' && age > ZOMBIE_THRESHOLD_MS) {
+          session.status = 'zombie';
           sessionsRef.current.set(sessionId, session);
+          hasChanges = true;
+
+          // Send push notification for zombie transition
+          sendZombieNotification(session.friendly_name, sessionId);
+        }
+
+        // Remove zombie sessions after 10 minute TTL
+        if (session.status === 'zombie' && age > ZOMBIE_TTL_MS) {
+          sessionsRef.current.delete(sessionId);
           hasChanges = true;
         }
 
-        // Only expire sessions that are finished
-        if (session.notification_type === 'finished') {
-          if (age > expiryMs) {
-            sessionsRef.current.delete(sessionId);
-            hasChanges = true;
-          }
+        // Remove idle sessions after configurable expiry
+        if (session.status === 'idle' && age > idleExpiryMs) {
+          sessionsRef.current.delete(sessionId);
+          hasChanges = true;
         }
       });
 
@@ -51,7 +77,7 @@ export function useSessions(options: UseSessionsOptions): UseSessionsReturn {
     }, STALE_CHECK_INTERVAL_MS);
 
     return () => clearInterval(interval);
-  }, [finishedExpiryMinutes]);
+  }, [idleExpiryMinutes]);
 
   const handleMessage = useCallback((message: AblyMessage) => {
     const { name, data } = message;
@@ -63,7 +89,7 @@ export function useSessions(options: UseSessionsOptions): UseSessionsReturn {
           session_id,
           friendly_name: data.friendly_name || 'Unknown',
           cwd: data.cwd || '',
-          status: 'active',
+          status: 'idle', // Sessions start idle, waiting for user input
           last_seen: timestamp,
         };
         sessionsRef.current.set(session_id, newSession);
@@ -135,7 +161,8 @@ export function useSessions(options: UseSessionsOptions): UseSessionsReturn {
         // Add to notification history if it's a notification
         if (data.notification_type) {
           const historyItem: NotificationHistoryItem = {
-            id: `${session_id}-${timestamp}`,
+            // Use Ably message ID for reliable deduplication, fall back to timestamp
+            id: message.id ?? `${session_id}-${timestamp}`,
             session_id,
             friendly_name: session.friendly_name,
             notification_type: data.notification_type,

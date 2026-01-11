@@ -187,7 +187,7 @@ case "$HOOK_EVENT" in
         PAYLOAD=$(build_ably_payload \
             --arg fn "$FRIENDLY_NAME" \
             --arg cwd "$CWD" \
-            '{session_id: $sid, friendly_name: $fn, cwd: $cwd, status: "waiting", notification_type: "finished", timestamp: ($ts | tonumber)}')
+            '{session_id: $sid, friendly_name: $fn, cwd: $cwd, status: "idle", timestamp: ($ts | tonumber)}')
         send_to_ably "status_update" "$PAYLOAD"
         send_push_notification "Finished" "${FRIENDLY_NAME:0:30} is waiting for input"
         ;;
