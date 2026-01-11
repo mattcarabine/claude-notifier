@@ -98,12 +98,14 @@ get_friendly_name() {
         project_name=$(basename "$CWD")
     fi
 
-    # Extract first user message from transcript
+    # Extract first user message from transcript (skip meta messages)
     local message_snippet=""
     if [ -f "$TRANSCRIPT_PATH" ]; then
         # User messages have type:"user" and message.content is a string
-        message_snippet=$(grep -m1 '"type":"user"' "$TRANSCRIPT_PATH" 2>/dev/null | \
-            jq -r '.message.content // empty' 2>/dev/null | \
+        # Skip meta messages (isMeta:true) which contain system-injected content
+        message_snippet=$(grep '"type":"user"' "$TRANSCRIPT_PATH" 2>/dev/null | \
+            jq -r 'select(.isMeta != true) | .message.content // empty' 2>/dev/null | \
+            head -n 1 | \
             head -c 35 | \
             tr '\n' ' ' | \
             sed 's/[[:space:]]*$//')
